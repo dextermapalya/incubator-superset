@@ -34,7 +34,7 @@ version: "3.7"
 services:
   redis:
     image: redis:3.2
-    container_name: superset_cache
+    container_name: superset_cache_redis
     restart: unless-stopped
     ports:
       - "127.0.0.1:6379:6379"
@@ -44,27 +44,27 @@ services:
   db:
     env_file: docker/.env
     image: postgres:10
-    container_name: superset_db
+    container_name: superset_db_pg
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - db_home:/var/lib/postgresql/data
 
-  superset:
+  superset_new:
     env_file: docker/.env
     build: *superset-build
-    container_name: superset_app
+    container_name: superset_app_main
     command: ["flask", "run", "-p", "8088", "--with-threads", "--reload", "--debugger", "--host=0.0.0.0"]
     restart: unless-stopped
     ports:
-      - 8088:8088
+      - 8091:8088
     depends_on: *superset-depends-on
     volumes: *superset-volumes
 
   superset-init:
     build: *superset-build
-    container_name: superset_init
+    container_name: superset_init_tmp
     command: ["/app/docker-init.sh"]
     env_file: docker/.env
     depends_on: *superset-depends-on
@@ -72,7 +72,7 @@ services:
 
   superset-node:
     image: node:10-jessie
-    container_name: superset_node
+    container_name: superset_node_jes
     command: ["bash", "-c", "cd /app/superset-frontend && npm install --global webpack webpack-cli && npm install && npm run dev"]
     env_file: docker/.env
     depends_on: *superset-depends-on
@@ -80,7 +80,7 @@ services:
 
   superset-worker:
     build: *superset-build
-    container_name: superset_worker
+    container_name: superset_worker_wrk
     command: ["celery", "worker", "--app=superset.tasks.celery_app:app", "-Ofair", "-l", "INFO"]
     env_file: docker/.env
     restart: unless-stopped
@@ -89,7 +89,7 @@ services:
 
   superset-tests-worker:
     build: *superset-build
-    container_name: superset_tests_worker
+    container_name: superset_tests_worker_wrk
     command: ["celery", "worker", "--app=superset.tasks.celery_app:app", "-Ofair", "-l", "INFO"]
     env_file: docker/.env
     environment:
@@ -109,3 +109,9 @@ volumes:
     external: false
   redis:
     external: false
+
+networks:
+  default:
+    external:
+      name: shared_network
+    

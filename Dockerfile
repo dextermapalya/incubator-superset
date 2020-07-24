@@ -29,6 +29,13 @@ RUN mkdir /app \
             libpq-dev \
         && rm -rf /var/lib/apt/lists/*
 
+RUN apt-get update -y
+# Install dependencies to fix `curl https support error` and `elaying package configuration warning`
+RUN apt-get install -y apt-transport-https apt-utils
+
+# Install common useful packages
+RUN apt-get install -y vim less curl netcat postgresql-client default-mysql-client redis-tools
+
 # First, we just wanna install requirements, which will allow us to utilize the cache
 # in order to only build if and only if requirements change
 COPY ./requirements.txt /app/

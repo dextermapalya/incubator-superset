@@ -24,8 +24,11 @@
 
 import logging
 import os
+from superset.config import *
 
 from cachelib.file import FileSystemCache
+from cachelib.redis import RedisCache
+#from werkzeug.contrib.cache import RedisCache
 
 logger = logging.getLogger()
 
@@ -67,8 +70,24 @@ REDIS_CELERY_DB = get_env_variable("REDIS_CELERY_DB", 0)
 REDIS_RESULTS_DB = get_env_variable("REDIS_CELERY_DB", 1)
 
 
-RESULTS_BACKEND = FileSystemCache("/app/superset_home/sqllab")
+#RESULTS_BACKEND = FileSystemCache("/app/superset_home/sqllab")
+RESULTS_BACKEND = RedisCache(host=REDIS_HOST, port=REDIS_PORT, key_prefix='superset_results')
 
+
+#CACHE CONFIG
+CACHE_CONFIG = {
+'CACHE_TYPE': 'redis',
+'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24, # 1 day default (in secs)
+'CACHE_KEY_PREFIX': 'superset_results',
+'CACHE_REDIS_URL': 'redis://superset_cache:6379/0',
+}
+
+TABLE_NAMES_CACHE_CONFIG = {
+'CACHE_TYPE': 'redis',
+'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24, # 1 day default (in secs)
+'CACHE_KEY_PREFIX': 'superset_results',
+'CACHE_REDIS_URL': 'redis://superset_cache:6379/0',
+}
 
 class CeleryConfig(object):
     BROKER_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_CELERY_DB}"

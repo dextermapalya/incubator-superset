@@ -34,7 +34,7 @@ RUN apt-get update -y
 RUN apt-get install -y apt-transport-https apt-utils
 
 # Install common useful packages
-RUN apt-get install -y vim less curl netcat postgresql-client default-mysql-client redis-tools
+RUN apt-get install -y vim less curl netcat postgresql-client default-mysql-client redis-tools sudo
 
 # First, we just wanna install requirements, which will allow us to utilize the cache
 # in order to only build if and only if requirements change
@@ -42,7 +42,12 @@ COPY ./requirements.txt /app/
 RUN cd /app \
         && pip install --no-cache -r requirements.txt
 
+RUN apt-get update && apt-get install -y firefox-esr
 
+RUN wget https://github.com/mozilla/geckodriver/releases/download/v0.24.0/geckodriver-v0.24.0-linux64.tar.gz
+RUN tar -x geckodriver -zf geckodriver-v0.24.0-linux64.tar.gz -O > /usr/bin/geckodriver
+RUN chmod +x /usr/bin/geckodriver
+RUN rm geckodriver-v0.24.0-linux64.tar.gz
 ######################################################################
 # Node stage to deal with static asset construction
 ######################################################################
@@ -131,4 +136,7 @@ RUN cd /app \
     && pip install --ignore-installed -r requirements-dev.txt \
     && pip install --ignore-installed -r requirements-extra.txt \
     && pip install --ignore-installed -r requirements-local.txt || true
+
+RUN chown -R superset:superset /var/log/
+RUN chown -R superset:superset /var/run/
 USER superset

@@ -101,7 +101,7 @@ services:
     volumes: *superset-volumes
     environment:
       DATABASE_HOST: superset_db
-      DATABASE_DB: test
+      DATABASE_DB: superset
       REDIS_CELERY_DB: 2
       REDIS_RESULTS_DB: 3
       REDIS_HOST: superset_cache

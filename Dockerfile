@@ -139,4 +139,5 @@ RUN cd /app \
 
 RUN chown -R superset:superset /var/log/
 RUN chown -R superset:superset /var/run/
+RUN chown -R superset:superset /app
 USER superset

@@ -29,6 +29,7 @@ from superset.config import *
 from cachelib.file import FileSystemCache
 from cachelib.redis import RedisCache
 #from werkzeug.contrib.cache import RedisCache
+from celery.schedules import crontab
 
 logger = logging.getLogger()
 
@@ -91,15 +92,38 @@ TABLE_NAMES_CACHE_CONFIG = {
 
 class CeleryConfig(object):
     BROKER_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_CELERY_DB}"
-    CELERY_IMPORTS = ("superset.sql_lab",)
+    CELERY_IMPORTS = ("superset.sql_lab", "superset.tasks",)
     CELERY_RESULT_BACKEND = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_RESULTS_DB}"
-    CELERY_ANNOTATIONS = {"tasks.add": {"rate_limit": "10/s"}}
+    CELERY_ANNOTATIONS = {"tasks.add": {"rate_limit": "10/s"},
+            'email_reports.send': {
+                'rate_limit': '1/s',
+                'time_limit': 5,
+                'soft_time_limit': 7,
+                'ignore_result': True,
+            },
+    
+    }
+    CELERYBEAT_SCHEDULE = {
+        'email_reports.schedule_hourly': {
+            'task': 'email_reports.schedule_hourly',
+            'schedule': crontab(minute=1, hour='*'),
+        },
+    }
     CELERY_TASK_PROTOCOL = 1
 
 
 CELERY_CONFIG = CeleryConfig
 SQLLAB_CTAS_NO_LIMIT = True
+ENABLE_SCHEDULED_EMAIL_REPORTS = True
+EMAIL_NOTIFICATIONS = True
 
+SMTP_HOST = "smtp.gmail.com"
+SMTP_STARTTLS = True
+SMTP_SSL = False
+SMTP_USER = "dexter.m@apalya.com"
+SMTP_PORT = 25
+SMTP_PASSWORD = "abcd1234" #os.environ.get("SMTP_PASSWORD")
+SMTP_MAIL_FROM = "dexter.m@apalya.com"
 #
 # Optionally import superset_config_docker.py (which will have been included on
 # the PYTHONPATH) in order to allow for local settings to be overridden

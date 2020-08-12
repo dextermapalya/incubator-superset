@@ -832,6 +832,13 @@ def get_email_address_list(address_string: str) -> List[str]:
     return [x.strip() for x in address_string_list if x.strip()]
 
 
+def get_email_address_str(address_string: str) -> str:
+    address_list = get_email_address_list(address_string)
+    address_list_str = ", ".join(address_list)
+
+    return address_list_str
+
+
 def choicify(values: Iterable[Any]) -> List[Tuple[Any, Any]]:
     """Takes an iterable and makes an iterable of tuples with it"""
     return [(v, v) for v in values]
@@ -1015,6 +1022,13 @@ def get_example_database() -> "Database":
     return get_or_create_db("examples", db_uri)
 
 
+def get_main_database() -> "Database":
+    from superset import conf
+
+    db_uri = conf.get("SQLALCHEMY_DATABASE_URI")
+    return get_or_create_db("main", db_uri)
+
+
 def is_adhoc_metric(metric: Metric) -> bool:
     return bool(
         isinstance(metric, dict)
@@ -1088,11 +1102,13 @@ def get_since_until(  # pylint: disable=too-many-arguments
     relative_end = parse_human_datetime(  # type: ignore
         relative_end if relative_end else "today"
     )
+        
     common_time_frames = {
         "Last day": (
             relative_start - relativedelta(days=1),  # type: ignore
             relative_end,
         ),
+        "Today": (relative_start - relativedelta(days=0), relative_end +  relativedelta(hours=24) ),
         "Last week": (
             relative_start - relativedelta(weeks=1),  # type: ignore
             relative_end,
@@ -1364,6 +1380,16 @@ def get_iterable(x: Any) -> List[Any]:
     """
 
     return x if isinstance(x, list) else [x]
+
+
+def get_form_data_token(form_data: Dict[str, Any]) -> str:
+    """
+    Return the token contained within form data or generate a new one.
+
+    :param form_data: chart form data
+    :return: original token if predefined, otherwise new uuid4 based token
+    """
+    return form_data.get("token") or "token_" + uuid.uuid4().hex[:8]
 
 
 class LenientEnum(Enum):

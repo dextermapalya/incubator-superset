@@ -717,6 +717,14 @@ class FavStar(Model):  # pylint: disable=too-few-public-methods
     obj_id = Column(Integer)
     dttm = Column(DateTime, default=datetime.utcnow)
 
+class UserDashboard(Model):  # pylint: disable=too-few-public-methods
+    __tablename__ = "user_dashboards"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("ab_user.id"))
+    class_name = Column(String(50))
+    obj_id = Column(Integer)
+    dttm = Column(DateTime, default=datetime.utcnow)
 
 # events for updating tags
 if is_feature_enabled("TAGGING_SYSTEM"):

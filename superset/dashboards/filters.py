@@ -59,6 +59,7 @@ class DashboardFilter(BaseFilter):  # pylint: disable=too-few-public-methods
         user_roles = [role.name.lower() for role in list(get_user_roles())]
         if "admin" in user_roles:
             return query
+            
 
         datasource_perms = security_manager.user_view_menu_names("datasource_access")
         schema_perms = security_manager.user_view_menu_names("schema_access")
@@ -76,6 +77,8 @@ class DashboardFilter(BaseFilter):  # pylint: disable=too-few-public-methods
                 )
             )
         )
+        
+
 
         users_favorite_dash_query = db.session.query(FavStar.obj_id).filter(
             and_(
@@ -91,6 +94,14 @@ class DashboardFilter(BaseFilter):  # pylint: disable=too-few-public-methods
                 == security_manager.user_model.get_user_id()
             )
         )
+        
+        if "custom" in user_roles:
+            query = query.filter(
+                and_(
+                    Dashboard.id.in_(owner_ids_query),
+                )
+            )
+            return query
 
         query = query.filter(
             or_(

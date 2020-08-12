@@ -18,6 +18,8 @@ from typing import Any
 
 from sqlalchemy import and_, or_
 from sqlalchemy.orm.query import Query
+import logging
+logger = logging.getLogger(__name__)
 
 from superset import db, security_manager
 from superset.models.core import FavStar
@@ -43,6 +45,7 @@ class DashboardFilter(BaseFilter):  # pylint: disable=too-few-public-methods
     def apply(self, query: Query, value: Any) -> Query:
         user_roles = [role.name.lower() for role in list(get_user_roles())]
         if "admin" in user_roles:
+            logger.info("Query {}".format(query))
             return query
 
         datasource_perms = security_manager.user_view_menu_names("datasource_access")

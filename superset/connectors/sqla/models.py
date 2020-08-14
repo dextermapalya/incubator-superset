@@ -18,13 +18,16 @@ import logging
 from collections import OrderedDict
 from datetime import datetime, timedelta
 from typing import Any, Dict, Hashable, List, NamedTuple, Optional, Tuple, Union
+from superset.models.dashboard import Dashboard, dashboard_user
 
 import pandas as pd
 import sqlalchemy as sa
 import sqlparse
-from flask import escape, Markup
+from flask import escape, Markup, request
+
 from flask_appbuilder import Model
 from flask_babel import lazy_gettext as _
+from jinja2.exceptions import TemplateError
 from sqlalchemy import (
     and_,
     asc,
@@ -40,7 +43,7 @@ from sqlalchemy import (
     Table,
     Text,
 )
-from sqlalchemy.exc import CompileError
+from sqlalchemy.exc import CompileError, SQLAlchemyError
 from sqlalchemy.orm import backref, Query, relationship, RelationshipProperty, Session
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.schema import UniqueConstraint
@@ -51,7 +54,7 @@ from superset import app, db, is_feature_enabled, security_manager
 from superset.connectors.base.models import BaseColumn, BaseDatasource, BaseMetric
 from superset.constants import NULL_STRING
 from superset.db_engine_specs.base import TimestampExpression
-from superset.exceptions import DatabaseNotFound
+from superset.exceptions import DatabaseNotFound, QueryObjectValidationError
 from superset.jinja_context import (
     BaseTemplateProcessor,
     ExtraCache,
@@ -66,7 +69,6 @@ from superset.utils import core as utils, import_datasource
 config = app.config
 metadata = Model.metadata  # pylint: disable=no-member
 logger = logging.getLogger(__name__)
-
 
 class SqlaQuery(NamedTuple):
     extra_cache_keys: List[Any]
@@ -408,6 +410,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
     database_id = Column(Integer, ForeignKey("dbs.id"), nullable=False)
     fetch_values_predicate = Column(String(1000))
     owners = relationship(owner_class, secondary=sqlatable_user, backref="tables")
+    #logger.info("AAAAAAAAAAA {}".format(owners) )
     database = relationship(
         "Database",
         backref=backref("tables", cascade="all, delete-orphan"),
@@ -417,6 +420,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
     sql = Column(Text)
     is_sqllab_view = Column(Boolean, default=False)
     template_params = Column(Text)
+
 
     baselink = "tablemodelview"
 
@@ -494,6 +498,10 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         return self.table_name
 
     @property
+    def datasource_type(self) -> str:
+        return self.type
+
+    @property
     def database_name(self) -> str:
         return self.database.name
 
@@ -512,6 +520,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
             .filter(cls.table_name == datasource_name)
             .filter(Database.database_name == database_name)
         )
+        logger.info("@@@@@@@@@ {}".format(query))
         # Handling schema being '' or None, which is easier to handle
         # in python than in the SQLA query in a multi-dialect way
         for tbl in query.all():
@@ -609,6 +618,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
             data_["main_dttm_col"] = self.main_dttm_col
             data_["fetch_values_predicate"] = self.fetch_values_predicate
             data_["template_params"] = self.template_params
+
             data_["is_sqllab_view"] = self.is_sqllab_view
         return data_
 
@@ -630,7 +640,15 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
 
         if self.fetch_values_predicate:
             tp = self.get_template_processor()
-            qry = qry.where(text(tp.process_template(self.fetch_values_predicate)))
+            try:
+                qry = qry.where(text(tp.process_template(self.fetch_values_predicate)))
+            except TemplateError as ex:
+                raise QueryObjectValidationError(
+                    _(
+                        "Error in jinja expression in fetch values predicate: %(msg)s",
+                        msg=ex.message,
+                    )
+                )
 
         engine = self.database.get_sqla_engine()
         sql = "{}".format(qry.compile(engine, compile_kwargs={"literal_binds": True}))
@@ -643,6 +661,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         """Apply config's SQL_QUERY_MUTATOR
 
         Typically adds comments to the query with context"""
+        logger.info("XXXXXXXXXX {} --- {} ".format(utils.get_userid(), utils.get_username() ) )
         sql_query_mutator = config["SQL_QUERY_MUTATOR"]
         if sql_query_mutator:
             username = utils.get_username()
@@ -654,8 +673,9 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
 
     def get_query_str_extended(self, query_obj: QueryObjectDict) -> QueryStringExtended:
         sqlaq = self.get_sqla_query(**query_obj)
+
         sql = self.database.compile_sqla_query(sqlaq.sqla_query)
-        logger.info(sql)
+        logger.info("QQQQQQQQQQQQQQQ {}".format(sql) )
         sql = sqlparse.format(sql, reindent=True)
         sql = self.mutate_query_from_config(sql)
         return QueryStringExtended(
@@ -680,7 +700,16 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         if self.sql:
             from_sql = self.sql
             if template_processor:
-                from_sql = template_processor.process_template(from_sql)
+                try:
+                    from_sql = template_processor.process_template(from_sql)
+                except TemplateError as ex:
+                    raise QueryObjectValidationError(
+                        _(
+                            "Error in jinja expression in FROM clause: %(msg)s",
+                            msg=ex.message,
+                        )
+                    )
+
             from_sql = sqlparse.format(from_sql, strip_comments=True)
             return TextAsFrom(sa.text(from_sql), []).alias("expr_qry")
         return self.get_sqla_table()
@@ -726,10 +755,27 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         :returns: A list of SQL clauses to be ANDed together.
         :rtype: List[str]
         """
-        return [
-            text("({})".format(template_processor.process_template(f.clause)))
-            for f in security_manager.get_rls_filters(self)
-        ]
+        try:
+            return [
+                text("({})".format(template_processor.process_template(f.clause)))
+                for f in security_manager.get_rls_filters(self)
+            ]
+        except TemplateError as ex:
+            raise QueryObjectValidationError(
+                _("Error in jinja expression in RLS filters: %(msg)s", msg=ex.message,)
+            )
+    def get_user_params(self):
+        dashboard_id = request.args.get("dashboard_id")
+        user_metadata = db.session.query(dashboard_user).filter_by( user_id=utils.get_userid(), dashboard_id = dashboard_id ).one_or_none()
+        user_params = {"content_id":"", "tenant_id":"", "studio_id":""}
+        if user_metadata is not None:
+            metakeys = {3:"studio_id", 4:"content_id", 5:"tenant_id"}
+            for key in metakeys:
+                val = metakeys[key]
+                if utils.isValid(user_metadata[key]):
+                    user_params.update ({val: user_metadata[key]}) 
+        logger.info("XXXXX {} XXXXX".format( user_params ) )
+        return user_params
 
     def get_sqla_query(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements
         self,
@@ -765,7 +811,9 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
             "columns": {col.column_name: col for col in self.columns},
         }
         is_sip_38 = is_feature_enabled("SIP_38_VIZ_REARCHITECTURE")
-        template_kwargs.update(self.template_params_dict)
+        p = self.get_user_params()
+        self.alter_params({""})
+        template_kwargs.update(self.template_params_dict( p ))
         extra_cache_keys: List[Any] = []
         template_kwargs["extra_cache_keys"] = extra_cache_keys
         template_processor = self.get_template_processor(**template_kwargs)
@@ -787,7 +835,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         metrics_by_name: Dict[str, SqlMetric] = {m.metric_name: m for m in self.metrics}
 
         if not granularity and is_timeseries:
-            raise Exception(
+            raise QueryObjectValidationError(
                 _(
                     "Datetime column not provided as part table configuration "
                     "and is required by this type of chart"
@@ -798,7 +846,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
             and not columns
             and (is_sip_38 or (not is_sip_38 and not groupby))
         ):
-            raise Exception(_("Empty query?"))
+            raise QueryObjectValidationError(_("Empty query?"))
         metrics_exprs: List[ColumnElement] = []
         for metric in metrics:
             if utils.is_adhoc_metric(metric):
@@ -807,7 +855,9 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
             elif isinstance(metric, str) and metric in metrics_by_name:
                 metrics_exprs.append(metrics_by_name[metric].get_sqla_col())
             else:
-                raise Exception(_("Metric '%(metric)s' does not exist", metric=metric))
+                raise QueryObjectValidationError(
+                    _("Metric '%(metric)s' does not exist", metric=metric)
+                )
         if metrics_exprs:
             main_metric_expr = metrics_exprs[0]
         else:
@@ -954,7 +1004,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
                             != None
                         )
                     else:
-                        raise Exception(
+                        raise QueryObjectValidationError(
                             _("Invalid filter operation type: %(op)s", op=op)
                         )
         if config["ENABLE_ROW_LEVEL_SECURITY"]:
@@ -962,11 +1012,27 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         if extras:
             where = extras.get("where")
             if where:
-                where = template_processor.process_template(where)
+                try:
+                    where = template_processor.process_template(where)
+                except TemplateError as ex:
+                    raise QueryObjectValidationError(
+                        _(
+                            "Error in jinja expression in WHERE clause: %(msg)s",
+                            msg=ex.message,
+                        )
+                    )
                 where_clause_and += [sa.text("({})".format(where))]
             having = extras.get("having")
             if having:
-                having = template_processor.process_template(having)
+                try:
+                    having = template_processor.process_template(having)
+                except TemplateError as ex:
+                    raise QueryObjectValidationError(
+                        _(
+                            "Error in jinja expression in HAVING clause: %(msg)s",
+                            msg=ex.message,
+                        )
+                    )
                 having_clause_and += [sa.text("({})".format(having))]
         if granularity:
             qry = qry.where(and_(*(time_filters + where_clause_and)))
@@ -1113,7 +1179,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         ):
             ob = metrics_by_name[timeseries_limit_metric].get_sqla_col()
         else:
-            raise Exception(
+            raise QueryObjectValidationError(
                 _("Metric '%(metric)s' does not exist", metric=timeseries_limit_metric)
             )
 
@@ -1138,6 +1204,8 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         qry_start_dttm = datetime.now()
         query_str_ext = self.get_query_str_extended(query_obj)
         sql = query_str_ext.sql
+        logger.info("QQQQQQQQQ1 {}".format(sql))
+        logger.info( " Session {}".format( Session) )
         status = utils.QueryStatus.SUCCESS
         errors = None
         error_message = None
@@ -1155,7 +1223,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
             labels_expected = query_str_ext.labels_expected
             if df is not None and not df.empty:
                 if len(df.columns) != len(labels_expected):
-                    raise Exception(
+                    raise QueryObjectValidationError(
                         f"For {sql}, df.columns: {df.columns}"
                         f" differs from {labels_expected}"
                     )
@@ -1189,13 +1257,13 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         """Fetches the metadata for the table and merges it in"""
         try:
             table_ = self.get_sqla_table_object()
-        except Exception as ex:
-            logger.exception(ex)
-            raise Exception(
+        except SQLAlchemyError:
+            raise QueryObjectValidationError(
                 _(
-                    "Table [{}] doesn't seem to exist in the specified database, "
-                    "couldn't fetch column information"
-                ).format(self.table_name)
+                    "Table %(table)s doesn't seem to exist in the specified database, "
+                    "couldn't fetch column information",
+                    table=self.table_name,
+                )
             )
 
         metrics = []

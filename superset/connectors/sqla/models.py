@@ -410,7 +410,6 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
     database_id = Column(Integer, ForeignKey("dbs.id"), nullable=False)
     fetch_values_predicate = Column(String(1000))
     owners = relationship(owner_class, secondary=sqlatable_user, backref="tables")
-    #logger.info("AAAAAAAAAAA {}".format(owners) )
     database = relationship(
         "Database",
         backref=backref("tables", cascade="all, delete-orphan"),
@@ -520,7 +519,6 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
             .filter(cls.table_name == datasource_name)
             .filter(Database.database_name == database_name)
         )
-        logger.info("@@@@@@@@@ {}".format(query))
         # Handling schema being '' or None, which is easier to handle
         # in python than in the SQLA query in a multi-dialect way
         for tbl in query.all():
@@ -618,7 +616,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
             data_["main_dttm_col"] = self.main_dttm_col
             data_["fetch_values_predicate"] = self.fetch_values_predicate
             data_["template_params"] = self.template_params
-
+            self.user_params = {"name":"Dexter M"}
             data_["is_sqllab_view"] = self.is_sqllab_view
         return data_
 
@@ -661,7 +659,6 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         """Apply config's SQL_QUERY_MUTATOR
 
         Typically adds comments to the query with context"""
-        logger.info("XXXXXXXXXX {} --- {} ".format(utils.get_userid(), utils.get_username() ) )
         sql_query_mutator = config["SQL_QUERY_MUTATOR"]
         if sql_query_mutator:
             username = utils.get_username()
@@ -675,7 +672,6 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         sqlaq = self.get_sqla_query(**query_obj)
 
         sql = self.database.compile_sqla_query(sqlaq.sqla_query)
-        logger.info("QQQQQQQQQQQQQQQ {}".format(sql) )
         sql = sqlparse.format(sql, reindent=True)
         sql = self.mutate_query_from_config(sql)
         return QueryStringExtended(
@@ -769,12 +765,11 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         user_metadata = db.session.query(dashboard_user).filter_by( user_id=utils.get_userid(), dashboard_id = dashboard_id ).one_or_none()
         user_params = {"content_id":"", "tenant_id":"", "studio_id":""}
         if user_metadata is not None:
-            metakeys = {3:"studio_id", 4:"content_id", 5:"tenant_id"}
+            metakeys = {3:"studio_id", 4:"tenant_id", 5:"content_id"}
             for key in metakeys:
                 val = metakeys[key]
                 if utils.isValid(user_metadata[key]):
                     user_params.update ({val: user_metadata[key]}) 
-        logger.info("XXXXX {} XXXXX".format( user_params ) )
         return user_params
 
     def get_sqla_query(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements
@@ -811,9 +806,9 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
             "columns": {col.column_name: col for col in self.columns},
         }
         is_sip_38 = is_feature_enabled("SIP_38_VIZ_REARCHITECTURE")
-        p = self.get_user_params()
-        self.alter_params({""})
-        template_kwargs.update(self.template_params_dict( p ))
+        #self.alter_params({"content_id", "1111"})
+        self.user_params = self.get_user_params()
+        template_kwargs.update(self.template_params_dict)
         extra_cache_keys: List[Any] = []
         template_kwargs["extra_cache_keys"] = extra_cache_keys
         template_processor = self.get_template_processor(**template_kwargs)
@@ -1204,8 +1199,6 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         qry_start_dttm = datetime.now()
         query_str_ext = self.get_query_str_extended(query_obj)
         sql = query_str_ext.sql
-        logger.info("QQQQQQQQQ1 {}".format(sql))
-        logger.info( " Session {}".format( Session) )
         status = utils.QueryStatus.SUCCESS
         errors = None
         error_message = None

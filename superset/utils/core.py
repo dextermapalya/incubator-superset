@@ -1262,6 +1262,12 @@ def get_username() -> Optional[str]:
     except Exception:  # pylint: disable=broad-except
         return None
 
+def get_userid() -> Optional[str]:
+    """Get userid if within the flask context, otherwise return noffin'"""
+    try:
+        return g.user.id
+    except Exception:  # pylint: disable=broad-except
+        return None
 
 def parse_ssl_cert(certificate: str) -> _Certificate:
     """
@@ -1517,3 +1523,15 @@ class PostProcessingContributionOrientation(str, Enum):
 
     ROW = "row"
     COLUMN = "column"
+
+def isValid(val):
+    valid = False
+    try:
+        if val is not None:
+            if isinstance(val, str):
+                if val and val.strip():
+                    valid = True
+        return valid
+    except Exception as ex:
+        logger.error("isValid Error {}".format(repr(ex)))
+        raise

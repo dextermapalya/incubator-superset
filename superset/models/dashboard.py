@@ -113,6 +113,9 @@ dashboard_user = Table(
     Column("id", Integer, primary_key=True),
     Column("user_id", Integer, ForeignKey("ab_user.id")),
     Column("dashboard_id", Integer, ForeignKey("dashboards.id")),
+    Column("studio_id", String(100)),
+    Column("tenant_id", String(100)),
+    Column("content_id", String(100)),
 )
 
 
@@ -133,7 +136,7 @@ class Dashboard(  # pylint: disable=too-many-instance-attributes
     slices = relationship("Slice", secondary=dashboard_slices, backref="dashboards")
     owners = relationship(security_manager.user_model, secondary=dashboard_user)
     published = Column(Boolean, default=False)
-
+    
     export_fields = [
         "dashboard_title",
         "position_json",
@@ -175,6 +178,7 @@ class Dashboard(  # pylint: disable=too-many-instance-attributes
 
     @property
     def charts(self) -> List[Optional["BaseDatasource"]]:
+        logger.info("DDDDDDDDDD {}".format(self.slices))
         return [slc.chart for slc in self.slices]
 
     @property

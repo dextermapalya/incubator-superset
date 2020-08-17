@@ -324,10 +324,7 @@ class ImportMixin:
     @property
     def template_params_dict(self) -> Dict[Any, Any]:
         response = json_to_dict(self.template_params)  # type: ignore
-        logger.info("UUUUUUUU 1111{}".format(user_params))
-        response.update(user_params)
-        #response = replace_params_with_user_params(response, user_params)
-        logger.info("UUUUUUUU {}".format(response))
+        response.update(self.user_params)
         return response
 
 

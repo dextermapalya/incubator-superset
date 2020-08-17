@@ -32,6 +32,7 @@ from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.security.decorators import has_access, has_access_api
 from flask_appbuilder.security.sqla import models as ab_models
 from flask_babel import gettext as __, lazy_gettext as _
+from jinja2.exceptions import TemplateError
 from sqlalchemy import and_, or_, select
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.exc import (
@@ -535,7 +536,7 @@ class Superset(BaseSupersetView):  # pylint: disable=too-many-public-methods
 
             return self.generate_json(viz_obj, response_type)
         except SupersetException as ex:
-            return json_error_response(utils.error_msg_from_exception(ex))
+            return json_error_response(utils.error_msg_from_exception(ex), 400)
 
     @event_logger.log_this
     @has_access
@@ -887,6 +888,9 @@ class Superset(BaseSupersetView):  # pylint: disable=too-many-public-methods
     def schemas(  # pylint: disable=no-self-use
         self, db_id: int, force_refresh: str = "false"
     ) -> FlaskResponse:
+        logger.warning(
+            "This API endpoint is deprecated and will be removed in version 1.0.0"
+        )
         db_id = int(db_id)
         database = db.session.query(models.Database).get(db_id)
         if database:
@@ -1129,10 +1133,10 @@ class Superset(BaseSupersetView):  # pylint: disable=too-many-public-methods
                 conn.scalar(select([1]))
                 return json_success('"OK"')
         except CertificateException as ex:
-            logger.info(ex.message)
+            logger.info("Certificate exception")
             return json_error_response(ex.message)
-        except (NoSuchModuleError, ModuleNotFoundError) as ex:
-            logger.info("Invalid driver %s", ex)
+        except (NoSuchModuleError, ModuleNotFoundError):
+            logger.info("Invalid driver")
             driver_name = make_url(uri).drivername
             return json_error_response(
                 _(
@@ -1141,24 +1145,24 @@ class Superset(BaseSupersetView):  # pylint: disable=too-many-public-methods
                 ),
                 400,
             )
-        except ArgumentError as ex:
-            logger.info("Invalid URI %s", ex)
+        except ArgumentError:
+            logger.info("Invalid URI")
             return json_error_response(
                 _(
                     "Invalid connection string, a valid string usually follows:\n"
                     "'DRIVER://USER:PASSWORD@DB-HOST/DATABASE-NAME'"
                 )
             )
-        except OperationalError as ex:
-            logger.warning("Connection failed %s", ex)
+        except OperationalError:
+            logger.warning("Connection failed")
             return json_error_response(
-                _("Connection failed, please check your connection settings."), 400
+                _("Connection failed, please check your connection settings"), 400
             )
         except DBSecurityException as ex:
-            logger.warning("Stopped an unsafe database connection. %s", ex)
+            logger.warning("Stopped an unsafe database connection")
             return json_error_response(_(str(ex)), 400)
         except Exception as ex:  # pylint: disable=broad-except
-            logger.error("Unexpected error %s", ex)
+            logger.error("Unexpected error %s", type(ex).__name__)
             return json_error_response(
                 _("Unexpected error occurred, please check your logs for details"), 400
             )
@@ -1585,13 +1589,17 @@ class Superset(BaseSupersetView):  # pylint: disable=too-many-public-methods
         if dashboard_id_or_slug.isdigit():
             qry = qry.filter_by(id=int(dashboard_id_or_slug))
         else:
+            logger.info("DDDDDDDDDDDDD {}".format(dashboard_id_or_slug) )
             qry = qry.filter_by(slug=dashboard_id_or_slug)
+        logger.info("DDDDDDDDDDDDD {}".format(qry) )
 
         dash = qry.one_or_none()
         if not dash:
             abort(404)
 
         datasources = defaultdict(list)
+        logger.info("DDDDDDDDDDD {}".format(datasources) )
+
         for slc in dash.slices:
             datasource = slc.datasource
             if datasource:
@@ -1690,6 +1698,7 @@ class Superset(BaseSupersetView):  # pylint: disable=too-many-public-methods
 
     @api
     @event_logger.log_this
+    @has_access
     @expose("/log/", methods=["POST"])
     def log(self) -> FlaskResponse:  # pylint: disable=no-self-use
         return Response(status=200)
@@ -1901,6 +1910,7 @@ class Superset(BaseSupersetView):  # pylint: disable=too-many-public-methods
             template_processor = get_template_processor(mydb)
             sql = template_processor.process_template(sql, **template_params)
 
+        logger.info("@@@@@@@@@ {} --- {}".format(sql, template_params))
         timeout = SQLLAB_QUERY_COST_ESTIMATE_TIMEOUT
         timeout_msg = f"The estimation exceeded the {timeout} seconds timeout."
         try:
@@ -2296,10 +2306,10 @@ class Superset(BaseSupersetView):  # pylint: disable=too-many-public-methods
             rendered_query = template_processor.process_template(
                 query.sql, **template_params
             )
-        except Exception as ex:  # pylint: disable=broad-except
+        except TemplateError as ex:
             error_msg = utils.error_msg_from_exception(ex)
             return json_error_response(
-                f"Query {query_id}: Template rendering failed: {error_msg}"
+                f"Query {query_id}: Template syntax error: {error_msg}"
             )
 
         # Limit is not applied to the CTA queries if SQLLAB_CTAS_NO_LIMIT flag is set

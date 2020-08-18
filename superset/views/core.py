@@ -1589,16 +1589,13 @@ class Superset(BaseSupersetView):  # pylint: disable=too-many-public-methods
         if dashboard_id_or_slug.isdigit():
             qry = qry.filter_by(id=int(dashboard_id_or_slug))
         else:
-            logger.info("DDDDDDDDDDDDD {}".format(dashboard_id_or_slug) )
             qry = qry.filter_by(slug=dashboard_id_or_slug)
-        logger.info("DDDDDDDDDDDDD {}".format(qry) )
 
         dash = qry.one_or_none()
         if not dash:
             abort(404)
 
         datasources = defaultdict(list)
-        logger.info("DDDDDDDDDDD {}".format(datasources) )
 
         for slc in dash.slices:
             datasource = slc.datasource
@@ -1910,7 +1907,7 @@ class Superset(BaseSupersetView):  # pylint: disable=too-many-public-methods
             template_processor = get_template_processor(mydb)
             sql = template_processor.process_template(sql, **template_params)
 
-        logger.info("@@@@@@@@@ {} --- {}".format(sql, template_params))
+        #logger.info("@@@@@@@@@ {} --- {}".format(sql, template_params))
         timeout = SQLLAB_QUERY_COST_ESTIMATE_TIMEOUT
         timeout_msg = f"The estimation exceeded the {timeout} seconds timeout."
         try:

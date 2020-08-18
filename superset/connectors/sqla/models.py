@@ -616,7 +616,6 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
             data_["main_dttm_col"] = self.main_dttm_col
             data_["fetch_values_predicate"] = self.fetch_values_predicate
             data_["template_params"] = self.template_params
-            self.user_params = {"name":"Dexter M"}
             data_["is_sqllab_view"] = self.is_sqllab_view
         return data_
 
@@ -806,8 +805,9 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
             "columns": {col.column_name: col for col in self.columns},
         }
         is_sip_38 = is_feature_enabled("SIP_38_VIZ_REARCHITECTURE")
-        #self.alter_params({"content_id", "1111"})
         self.user_params = self.get_user_params()
+        if self.user_params.get('content_id') and self.user_params.get('tenant_id'):
+            logger.info("UUUUUUUUU {}".format(self.user_params))
         template_kwargs.update(self.template_params_dict)
         extra_cache_keys: List[Any] = []
         template_kwargs["extra_cache_keys"] = extra_cache_keys

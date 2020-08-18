@@ -1108,6 +1108,7 @@ def get_since_until(  # pylint: disable=too-many-arguments
             relative_start - relativedelta(days=1),  # type: ignore
             relative_end,
         ),
+        #added by Dexter on Aug 13th so that today condition is also met
         "Today": (relative_start - relativedelta(days=0), relative_end +  relativedelta(hours=24) ),
         "Last week": (
             relative_start - relativedelta(weeks=1),  # type: ignore
@@ -1136,6 +1137,7 @@ def get_since_until(  # pylint: disable=too-many-arguments
             until = parse_human_datetime(until) if until else None  # type: ignore
         elif time_range in common_time_frames:
             since, until = common_time_frames[time_range]
+            logger.info(" Time Range {} {} {}".format(time_range, since, until) ) 
         elif time_range == "No filter":
             since = until = None
         else:

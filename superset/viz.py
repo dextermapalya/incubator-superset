@@ -251,6 +251,7 @@ class BaseViz:
         self.query = self.results.query
         self.status = self.results.status
         self.errors = self.results.errors
+        logger.info("DDDDD {}".format(self.query))
 
         df = self.results.df
         # Transform the timestamp we received from database to pandas supported
@@ -447,8 +448,11 @@ class BaseViz:
         if not query_obj:
             query_obj = self.query_obj()
         cache_key = self.cache_key(query_obj, **kwargs) if query_obj else None
-        cache_key = cache_key + self.request.args.get("dashboard_id")
-        logger.info("Cache key: @@@@ {} ".format(cache_key))
+        dashboard_id = self.request.args.get("dashboard_id") 
+        if dashboard_id and cache_key:
+            logger.info("Cache Key ::: #### {} {}".format(cache_key, dashboard_id))
+            cache_key = cache_key + dashboard_id 
+        #logger.info("Cache key: @@@ {} ".format(cache_key))
         is_loaded = False
         stacktrace = None
         df = None

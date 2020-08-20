@@ -29,7 +29,7 @@ down_revision = "d8bc074f7aad"
 from alembic import op
 from flask_appbuilder import Model
 from flask_appbuilder.models.mixins import AuditMixin
-from sqlalchemy import Column, ForeignKey, Integer, Table
+from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -59,6 +59,10 @@ dashboard_user = Table(
     Column("id", Integer, primary_key=True),
     Column("user_id", Integer, ForeignKey("ab_user.id")),
     Column("dashboard_id", Integer, ForeignKey("dashboards.id")),
+    Column("studio_id", String, nullable=True),
+    Column("tenant_id", String, nullable=True),
+    Column("content_id",String, nullable=True),
+
 )
 
 

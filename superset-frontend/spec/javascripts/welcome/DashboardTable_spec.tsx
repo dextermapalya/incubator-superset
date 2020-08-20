@@ -23,7 +23,7 @@ import configureStore from 'redux-mock-store';
 import fetchMock from 'fetch-mock';
 import { supersetTheme, ThemeProvider } from '@superset-ui/style';
 
-import ListView from 'src/components/ListView/ListView';
+import ListView from 'src/components/ListView';
 import DashboardTable from 'src/welcome/DashboardTable';
 
 // store needed for withToasts(DashboardTable)
@@ -56,7 +56,7 @@ describe('DashboardTable', () => {
         // there's a delay between response and updating state, so manually set it
         // rather than adding a timeout which could introduce flakiness
         wrapper.setState({ dashboards: mockDashboards });
-        expect(wrapper.find(ListView)).toHaveLength(1);
+        expect(wrapper.find(ListView)).toExist();
         done();
       });
     });

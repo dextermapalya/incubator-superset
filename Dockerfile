@@ -27,6 +27,7 @@ RUN mkdir /app \
             build-essential \
             default-libmysqlclient-dev \
             libpq-dev \
+            libsasl2-dev \
         && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update -y
@@ -38,9 +39,13 @@ RUN apt-get install -y vim less curl netcat postgresql-client default-mysql-clie
 
 # First, we just wanna install requirements, which will allow us to utilize the cache
 # in order to only build if and only if requirements change
-COPY ./requirements.txt /app/
+COPY ./requirements/*.txt  /app/requirements/
+COPY setup.py MANIFEST.in README.md /app/
+COPY superset-frontend/package.json /app/superset-frontend/
 RUN cd /app \
-        && pip install --no-cache -r requirements.txt
+    && mkdir -p superset/static \
+    && touch superset/static/version_info.json \
+    && pip install --no-cache -r requirements/local.txt
 
 RUN apt-get update && apt-get install -y firefox-esr
 
@@ -126,16 +131,17 @@ ENTRYPOINT ["/usr/bin/docker-entrypoint.sh"]
 ######################################################################
 FROM lean AS dev
 
-COPY ./requirements* ./docker/requirements* /app/
+COPY ./requirements/*.txt ./docker/requirements-*.txt/ /app/requirements/
 
 USER root
 # Cache everything for dev purposes...
 RUN cd /app \
-    && pip install --ignore-installed -e . \
-    && pip install --ignore-installed -r requirements.txt \
-    && pip install --ignore-installed -r requirements-dev.txt \
-    && pip install --ignore-installed -r requirements-extra.txt \
-    && pip install --ignore-installed -r requirements-local.txt || true
+    && pip install --no-cache -e . \
+    && pip install --no-cache -r requirements/docker.txt \
+    && pip install --no-cache -r requirements/requirements.txt \
+    && pip install --no-cache -r requirements/requirements-dev.txt \
+    && pip install --no-cache -r requirements/requirements-extra.txt \
+    && pip install --no-cache -r requirements/requirements-local.txt || true
 
 RUN chown -R superset:superset /var/log/
 RUN chown -R superset:superset /var/run/

@@ -459,8 +459,8 @@ class BaseViz:
         cache_key = self.cache_key(query_obj, **kwargs) if query_obj else None
         dashboard_id = self.request.args.get("dashboard_id") 
         if dashboard_id and cache_key:
-            logger.info("Cache Key ::: #### {} {}".format(cache_key, dashboard_id))
-            cache_key = cache_key + dashboard_id 
+            logger.info("Cache Key ::: #### {} {} {}".format(cache_key, dashboard_id, utils.get_userid()))
+            cache_key = cache_key + dashboard_id + str(utils.get_userid())
         #logger.info("Cache key: @@@ {} ".format(cache_key))
         is_loaded = False
         stacktrace = None
@@ -864,12 +864,14 @@ class PivotTableViz(BaseViz):
         if self.form_data.get("transpose_pivot"):
             groupby, columns = columns, groupby
 
+        #logger.info("{}+++ ____ {} ___***___ {} ___+++___ {}".format(aggfuncs, columns, metrics, self.form_data.get("pivot_margins")))
         df = df.pivot_table(
             index=groupby,
             columns=columns,
             values=metrics,
             aggfunc=aggfuncs,
-            margins=self.form_data.get("pivot_margins"),
+            margins=False
+            #self.form_data.get("pivot_margins"),
         )
 
         # Re-order the columns adhering to the metric ordering.

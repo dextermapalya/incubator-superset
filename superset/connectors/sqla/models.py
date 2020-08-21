@@ -812,6 +812,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
     def get_user_params(self):
         dashboard_id = request.args.get("dashboard_id")
         user_metadata = db.session.query(dashboard_user).filter_by( user_id=utils.get_userid(), dashboard_id = dashboard_id ).one_or_none()
+        logger.info("UUUUUUUUUUUU {} ++ {}-- {}".format(utils.get_userid(), dashboard_id, user_metadata))
         user_params = {"content_id":"", "tenant_id":"", "studio_id":""}
         if user_metadata is not None:
             metakeys = {3:"studio_id", 4:"tenant_id", 5:"content_id"}

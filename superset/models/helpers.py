@@ -325,7 +325,7 @@ class ImportMixin:
     def template_params_dict(self) -> Dict[Any, Any]:
         response = json_to_dict(self.template_params)  # type: ignore
         #Only if user_params keys have proper values then update the template params
-        if self.user_params.get('content_id') or self.user_params.get('tenant_id') or self.user_params.get('studio_id'):
+        if self.user_params.get('content_id') or self.user_params.get('tenant_id') or self.user_params.get('studio_id') or self.user_params.get('trailer_content_id'):
             response.update(self.user_params)
         return response
 

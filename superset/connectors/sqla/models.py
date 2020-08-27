@@ -815,7 +815,7 @@ class SqlaTable(  # pylint: disable=too-many-public-methods,too-many-instance-at
         logger.info("UUUUUUUUUUUU {} ++ {}-- {}".format(utils.get_userid(), dashboard_id, user_metadata))
         user_params = {"content_id":"", "tenant_id":"", "studio_id":""}
         if user_metadata is not None:
-            metakeys = {3:"studio_id", 4:"tenant_id", 5:"content_id"}
+            metakeys = {3:"studio_id", 4:"tenant_id", 5:"content_id", 6:"trailer_content_id"}
             for key in metakeys:
                 val = metakeys[key]
                 if utils.isValid(user_metadata[key]):

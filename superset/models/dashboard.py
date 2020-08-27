@@ -116,6 +116,7 @@ dashboard_user = Table(
     Column("studio_id", String(100)),
     Column("tenant_id", String(100)),
     Column("content_id", String(100)),
+    Column("trailer_content_id", String(100)),
 )
 
 
